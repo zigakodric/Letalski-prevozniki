@@ -19,7 +19,7 @@ server <- function(input, output, session) {
     ON letalisca.id = letalske_povezave.idprihodno
     WHERE letalske_povezave.idodhodno = ?id1"
     id <- letalisca["mesto"]
-    id_nas <- which(id == input$imena)
+    id_nas <- which(id == "Ljubljana")
     query <- sqlInterpolate(con, sql,id1 = id_nas) #preprecimo sql injectione
     t=dbGetQuery(con,query)
   })
