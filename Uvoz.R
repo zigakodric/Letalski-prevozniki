@@ -45,6 +45,7 @@ dbSendQuery(con,
 )
 
 #Izbiršemo podatke kje ne vemo kje se letališče nahaja in spremenimo tip
+#POZOR ZAENKRAT JE POTREBNO ROČNO NA BAZI VNESTI KODO ZA IZBRIS \N, DIREKTNO NE VEM ZAKAJ NE DELUJE
 dbSendQuery(con, 
             "DELETE from letalske_povezave WHERE idodhodno = '\N'; ")
 dbSendQuery(con, 

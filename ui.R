@@ -1,21 +1,19 @@
 library(markdown)
-
+library(leaflet)
+library(dplyr)
 navbarPage("Potovanje",
            tabPanel("Poišči svojo destinacijo",
                     sidebarLayout(
                       sidebarPanel(
-                        selectInput('imena',label ='izhodno',choices=NULL,selected = NULL, multiple = FALSE,width="450px"),
-                        selectInput('imena',label ='destinacija',choices=NULL,selected = NULL, multiple = FALSE,width="450px")
-                      )
-                      
-                      ,
-                      
-                      
-                      
+                        selectInput('mesta',label ='Mesto',choices=NULL,selected = NULL, multiple = FALSE,width="450px"),
+                        selectInput('letal',label ='Letališča',choices=NULL,selected = NULL, multiple = FALSE,width="450px")
+                      ),
                       
                       mainPanel(tableOutput("destinacije")
                      
                       )
-                    )))
+                    )),
+           tabPanel("Zemljevid destinacij",
+                    leafletOutput("mymap",height = 1000)))
 
 
