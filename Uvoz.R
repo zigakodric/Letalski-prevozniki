@@ -7,12 +7,8 @@ con <- dbConnect(drv, dbname = db, host = host,
 #Letališča
 letalisca <- read.csv("let.csv")
 
-#Zbrišemo nepotrebne podatke
-ohrani <- c("Ime", "Mesto", "Drzava", "IATA", "ICAO","X","Y")
-letalisca[ohrani]
 
 #Zapišemo podatke v tabelo v bazi
-#Odstranimo okrajšave
 dbSendQuery(con, "DROP TABLE IF EXISTS letalisca; ")
 dbWriteTable(con,'letalisca',letalisca, row.names=FALSE)
 dbSendQuery(con, "alter table letalisca add id serial")
@@ -23,26 +19,33 @@ dbSendQuery(con, "DROP TABLE IF EXISTS letalske_povezave; ")
 
 dbWriteTable(con,'letalske_povezave',povezave, row.names=FALSE)
 
-#Letalske družba
 
-letalske_druzbe <- read.csv("druzbe.csv")
 
-dbSendQuery(con, "DROP TABLE IF EXISTS letalske_druzbe; ")
+#Podatki o destinacijah
+pot <- read.csv("pod.csv")
 
-dbWriteTable(con,'letalske_druzbe',letalske_druzbe, row.names=FALSE)
+dbSendQuery(con, "DROP TABLE IF EXISTS pot; ")
+dbWriteTable(con, 'pot', pot, row.names=FALSE )
 
-#Letala
-letala <- read.csv("letala.csv")
-dbSendQuery(con, "DROP TABLE IF EXISTS letala; ")
+#Dodamo ID državam
+dbSendQuery(con, "alter table pot add id serial")
 
-dbWriteTable(con,'letala',letala, row.names=FALSE)
+#Varnostna tveganja v država
+#Ker nisem našel tabele primerne za uvoz sem tveganja prilagodil (tj. določil random število med 1 in 4) 
+#kar lahko privede do nelogičnih rezultatov :)
+drzave <- pot["geopoliticalarea"]
+tveganja <- round( runif(212, 1, 4))
+tveg <- cbind(drzave, data.frame(tveganja))
+dbSendQuery(con, "DROP TABLE IF EXSITS tveganja; ")
 
+dbWriteTable(con, 'tveganja', tveg, row.names = FALSE)
+dbSendQuery(con, "alter table tveganja add id serial ")
+dbSendQuery(con,"ALTER TABLE tveganja
+RENAME COLUMN id TO idtveg;")
+dbSendQuery(con,"ALTER TABLE tveganja
+RENAME COLUMN geopoliticalarea TO drzave;")
 #Urejanje podatkov
-#Iz baze odstranimo podatke o letalskih družbah, ki ne poslujejo več
-dbSendQuery(con, 
-            "DELETE from letalske_druzbe
-             WHERE operativna = 'N'; "
-)
+
 
 #Izbiršemo podatke kje ne vemo kje se letališče nahaja in spremenimo tip
 #POZOR ZAENKRAT JE POTREBNO ROČNO NA BAZI VNESTI KODO ZA IZBRIS \N, DIREKTNO NE VEM ZAKAJ NE DELUJE
@@ -54,10 +57,7 @@ dbSendQuery(con, "ALTER TABLE letalske_povezave ALTER COLUMN idodhodno  TYPE int
 )
 dbSendQuery(con, "ALTER TABLE letalske_povezave ALTER COLUMN idprihodno  TYPE integer USING (idprihodno::integer);"
 )
-#POPRAVIMO
-dbSendQuery(con,
-            "DELETE from letalske_povezave
-            WHERE idodhodno = 'N'")
+
 
 #Dodamo ID letališčem
 dbSendQuery(con, "ALTER table letalisca ADD id serial")

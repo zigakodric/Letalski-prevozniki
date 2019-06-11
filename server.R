@@ -1,3 +1,5 @@
+library(RPostgreSQL)
+source("auth_public.R")
 library(shiny)
 library(leaflet)
 library(dplyr)
@@ -6,86 +8,93 @@ con <- dbConnect(drv, dbname = db, host = host,
                  user = user, password = password)
 
 server <- function(input, output, session) {
-  #Iz baze uvozimo vse možna letališča
-  uvoz_mesta <- reactive({
+  session$onSessionEnded(function() {
     
+    dbDisconnect(con)
     
-    dbGetQuery(con, "SELECT  mesto, id from letalisca")
   })
+  
+
+  #Najprej iz baze uvozimo seznam vseh možnih držav
+  
+  uvoz_sezdr <- reactive({ 
+    g <- dbGetQuery(con, "SELECT drzava, id FROM letalisca")
+    })
+  
+  observe ({
+    updateSelectInput(session,"drz","Država",
+                      choices = uvoz_sezdr()
+    )
+    
+  })
+  
+  uvoz_mesta <- reactive({
+    sql <- "SELECT DISTINCT mesto, id FROM letalisca
+                  WHERE drzava = ?dr"
+    query <- sqlInterpolate(con, sql, dr = input$drz)
+    t <- dbGetQuery(con, query)
+
+    
+  })
+  
   observe ({
     updateSelectInput(session,"mesta","Mesta",
                       choices = uvoz_mesta()
     )
     
   })
-  
-  #prikaz mest
+
+
   najdi_destinacije <-reactive({
-    sql <- "SELECT ime, mesto, idprihodno,idodhodno FROM letalske_povezave 
+    l <- uvoz_mesta()
+    id2 <- l[l$mesto %in% input$mesta,][2]
+    
+    sql <- "SELECT ime, mesto, drzava, idprihodno,idodhodno FROM letalske_povezave 
     INNER JOIN letalisca
     ON letalisca.id = letalske_povezave.idprihodno
     WHERE letalske_povezave.idodhodno = ?id1"
-    id <- letalisca["mesto"]
-    id_nas <- which(id == "Berlin")+1
-    query <- sqlInterpolate(con, sql,id1 = id_nas) #preprecimo sql injectione
+    query <- sqlInterpolate(con, sql,id1 = id2[1,]) #preprecimo sql injectione in izberemo prvo letališče v mestu
     t=dbGetQuery(con,query)
+    
+    
   })
+
   
   output$destinacije <- renderTable({ #glavna tabela rezultatov
     tabela1=najdi_destinacije()
     tabela1[!duplicated(tabela1),]
-  }
-  )
-#Še po  
-  uvoz_letal <- reactive({
-    
-    
-    dbGetQuery(con, "SELECT  ime, id from letalisca")
-  })
-  observe ({
-    updateSelectInput(session,"letal","Letališče",
-                      choices = uvoz_letal()
-    )
-    
-  })
+    tabela1$idprihodno = NULL
+    tabela1$idodhodno = NULL
+    colnames(tabela1) <- c("Ime letališča", "Mesto", "Država")
   
-  #prikaz mest
-  najdi_destinacije <-reactive({
-    sql <- "SELECT ime, mesto, idprihodno,idodhodno FROM letalske_povezave 
-    INNER JOIN letalisca
-    ON letalisca.id = letalske_povezave.idprihodno
-    WHERE letalske_povezave.idodhodno = ?id1"
-    id <- letalisca["mesto"]
-    id_nas <- which(id == "London")[3]+1
-    query <- sqlInterpolate(con, sql,id1 = id_nas) #preprecimo sql injectione
-    t=dbGetQuery(con,query)
-  })
+    tabela1
+    
   
-  output$destinacije <- renderTable({ #glavna tabela rezultatov
-    tabela1=najdi_destinacije()
-    tabela1[!duplicated(tabela1),]
-  }
-  )
+
+  })
+
+
   #---------------------------------------------------------------------------------------------------
   #ZEMLJEVID
   podatki <- reactive({
-
     
+    l <- uvoz_mesta()
+    id2 <- l[l$mesto %in% input$mesta,][2]
     dbSendQuery(con, "DROP VIEW IF EXISTS zacasno; ")
     
     sql <- "CREATE VIEW zacasno AS
     SELECT ime, idprihodno,idodhodno FROM letalske_povezave 
     JOIN letalisca
     ON letalisca.id = letalske_povezave.idprihodno
-    WHERE letalske_povezave.idodhodno = 340"
-    id <- letalisca["mesto"]
-    id_nas <- which(id == "Berlin")[2]
-    query <- sqlInterpolate(con, sql,id1 = id_nas)
+    WHERE letalske_povezave.idodhodno = ?id1"
+    
+    query <- sqlInterpolate(con, sql,id1 = id2[1,])
     dbSendQuery(con, query)
+
     
     koordinate <- dbGetQuery(con, "SELECT x,y, mesto, id FROM letalisca
-    JOIN zacasno 
-    ON letalisca.id = zacasno.idprihodno")
+                             JOIN zacasno 
+                             ON letalisca.id = zacasno.idprihodno")
     koordinate$x <- as.numeric(koordinate$x)
     koordinate$y <- as.numeric(koordinate$y)
     
@@ -101,7 +110,66 @@ server <- function(input, output, session) {
       addMarkers(lng = ~y,
                  lat = ~x,
                  label = ~mesto
-                 )
+      )
     m
   })
-}
+
+
+#------------------------------------------------------------------------------------------------------
+#Tretji zavihek
+#Uvoz seznama držav glede na tveganja, ki ga izberemo
+  uvoz_drzave <- reactive({
+    dbSendQuery(con, "DROP VIEW IF EXISTS zacasno2")
+    sql <- "CREATE VIEW zacasno2 AS SELECT * FROM tveganja INNER JOIN pot ON pot.id = tveganja.idtveg WHERE tveganja <= ?tvegid"
+    query <- sqlInterpolate(con, sql,tvegid = input$tveganja)
+    dbSendQuery(con, query)
+    t <- dbGetQuery(con, "SELECT  geopoliticalarea, id from zacasno2")
+    setNames(t[[2]], t[[1]])
+    
+  })
+  
+  observe ({
+    updateSelectInput(session,"drzave","Država",
+                      choices = uvoz_drzave()
+    )
+    
+  })
+  
+  #Pošiščemo informacije
+  najdi_informacije <-reactive({
+  
+    sql_tra <- "SELECT travel_transportation FROM pot 
+                          WHERE id = ?drzava_id"
+    sql_zdr <-  "SELECT health FROM pot WHERE id = ?drzava_id"
+    sql_zak <- "SELECT local_laws_and_special_circumstances FROM pot WHERE id = ?drzava_id"
+    sql_var <- "SELECT safety_and_security FROM pot WHERE id = ?drzava_id"
+    sql_viz <- "SELECT entry_exit_requirements FROM pot WHERE id = ?drzava_id"
+    sql_spl <- "SELECT destination_description FROM pot WHERE id = ?drzava_id"
+    
+    
+
+    drzave = input$drzave
+    izbira <- c("Transport", "Zdravstvo", "Pravosodje", "Varnost", "Viza", "Splošno")
+    k <- c()
+    info <- input$info
+    sql_stavki <- c(sql_tra, sql_zdr,sql_zak,sql_var, sql_viz,sql_spl)
+    for (i in 1:length(info)){
+      
+      indeks_stavek <- match(info[i],izbira)
+      query <- sqlInterpolate(con, sql_stavki[indeks_stavek],drzava_id = drzave)
+      k[i] <- dbGetQuery(con, query)
+      
+    }
+    informacije <- matrix(k, nrow = 1, length(k))
+    colnames(informacije) <-input$info
+    informacije
+
+    })
+  
+  
+  output$informacije <- renderTable({ #glavna tabela rezultatov
+    tabela1=najdi_informacije()
+  })
+#------------------------------------------------------------------------------------------------------------------------------
+}  
+
