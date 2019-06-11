@@ -1,3 +1,5 @@
+source("auth_public.R")
+
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname = db, host = host,
                     user = user, password = password)
