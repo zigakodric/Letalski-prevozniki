@@ -1,7 +1,8 @@
 library(markdown)
 library(leaflet)
 library(dplyr)
-navbarPage("Potovanje",
+library(shinythemes)
+navbarPage(theme = shinytheme("cerulean"), "Potovanje",
            tabPanel("Poišči svojo destinacijo",
                     sidebarLayout(
                       sidebarPanel(
@@ -11,7 +12,7 @@ navbarPage("Potovanje",
                         
                       ),
                       
-                      mainPanel(paste("Možne destinacije"),tableOutput("destinacije")
+                      mainPanel(h2("Možne destinacije"),tableOutput("destinacije")
                      
                       )
                     )),
@@ -27,7 +28,7 @@ navbarPage("Potovanje",
                         selectInput("info", label =  "Zanima me", 
                                     choices = c("Transport", "Zdravstvo", "Pravosodje", "Varnost", "Viza", "Splošno"), multiple = TRUE)
                       ),
-                      mainPanel(tableOutput("informacije"))
+                      mainPanel(h2("Informacije o destinaciji"),tableOutput("informacije"))
                     ))
            
            
