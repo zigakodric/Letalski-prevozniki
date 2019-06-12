@@ -80,21 +80,17 @@ server <- function(input, output, session) {
     
     l <- uvoz_mesta()
     id2 <- l[l$mesto %in% input$mesta,][2]
-    dbSendQuery(con, "DROP VIEW IF EXISTS zacasno; ")
+
+  
     
-    sql <- "CREATE VIEW zacasno AS
-    SELECT ime, idprihodno,idodhodno FROM letalske_povezave 
-    JOIN letalisca
-    ON letalisca.id = letalske_povezave.idprihodno
-    WHERE letalske_povezave.idodhodno = ?id1"
-    
-    query <- sqlInterpolate(con, sql,id1 = id2[1,])
-    dbSendQuery(con, query)
 
     
-    koordinate <- dbGetQuery(con, "SELECT x,y, mesto, id FROM letalisca
-                             JOIN zacasno 
-                             ON letalisca.id = zacasno.idprihodno")
+    sql <- "SELECT x,y, mesto, id FROM letalisca
+                             JOIN vse_povezave 
+                             ON letalisca.id = vse_povezave.idprihodno
+                             WHERE vse_povezave.idodhodno = ?id1"
+    query <- sqlInterpolate(con, sql,id1 = id2[1,])
+    koordinate <- dbGetQuery(con, query)
     koordinate$x <- as.numeric(koordinate$x)
     koordinate$y <- as.numeric(koordinate$y)
     
@@ -119,11 +115,10 @@ server <- function(input, output, session) {
 #Tretji zavihek
 #Uvoz seznama držav glede na tveganja, ki ga izberemo
   uvoz_drzave <- reactive({
-    dbSendQuery(con, "DROP VIEW IF EXISTS zacasno2")
-    sql <- "CREATE VIEW zacasno2 AS SELECT * FROM tveganja INNER JOIN pot ON pot.id = tveganja.idtveg WHERE tveganja <= ?tvegid"
+    sql <- "SELECT  geopoliticalarea, id from tveg WHERE tveganja <= ?tvegid"
     query <- sqlInterpolate(con, sql,tvegid = input$tveganja)
-    dbSendQuery(con, query)
-    t <- dbGetQuery(con, "SELECT  geopoliticalarea, id from zacasno2")
+  
+    t <- dbGetQuery(con, query)
     setNames(t[[2]], t[[1]])
     
   })

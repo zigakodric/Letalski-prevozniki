@@ -1,5 +1,3 @@
-source("auth_public.R")
-
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname = db, host = host,
                     user = user, password = password)
@@ -49,19 +47,23 @@ RENAME COLUMN geopoliticalarea TO drzave;")
 #Urejanje podatkov
 
 
-#Izbiršemo podatke kje ne vemo kje se letališče nahaja in spremenimo tip
-#POZOR ZAENKRAT JE POTREBNO ROČNO NA BAZI VNESTI KODO ZA IZBRIS \N, DIREKTNO NE VEM ZAKAJ NE DELUJE
+#Izbiršemo podatke kjer ne vemo kje se letališče nahaja in spremenimo tip
++dbSendQuery(con, 
+            "DELETE from letalske_povezave WHERE idodhodno = '\\N'; ")
 dbSendQuery(con, 
-            "DELETE from letalske_povezave WHERE idodhodno = '\N'; ")
-dbSendQuery(con, 
-            "DELETE from letalske_povezave WHERE idprihodno = '\N'; ")
+            "DELETE from letalske_povezave WHERE idprihodno = '\\N'; ")
 dbSendQuery(con, "ALTER TABLE letalske_povezave ALTER COLUMN idodhodno  TYPE integer USING (idodhodno::integer);"
 )
 dbSendQuery(con, "ALTER TABLE letalske_povezave ALTER COLUMN idprihodno  TYPE integer USING (idprihodno::integer);"
 )
 
+#Ustvarimo pogled
+#vseh povezav
+dbSendQuery(con, sql <- "CREATE VIEW vse_povezave AS
+    SELECT ime, idprihodno,idodhodno FROM letalske_povezave 
+            JOIN letalisca
+            ON letalisca.id = letalske_povezave.idprihodno")
 
-#Dodamo ID letališčem
-dbSendQuery(con, "ALTER table letalisca ADD id serial")
-
+#za tveganja
+dbSendQuery(con, "CREATE VIEW tveg AS SELECT * FROM tveganja INNER JOIN pot ON pot.id = tveganja.idtveg")
 dbDisconnect(con)
