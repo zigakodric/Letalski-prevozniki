@@ -1,7 +1,14 @@
+source("auth.R")
+library(RPostgreSQL)
+library(dplyr)
+
+
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname = db, host = host,
                     user = user, password = password)
-
+#dodamo pravice
+dbSendQuery(con, "GRANT CONNECT ON DATABASE sem2019_zigak TO javnost;")
+dbSendQuery(con,"GRANT SELECT ON ALL TABLES IN SCHEMA public TO javnost;")
 #Uvoz podatkov
 
 #Letališča
@@ -48,7 +55,7 @@ RENAME COLUMN geopoliticalarea TO drzave;")
 
 
 #Izbiršemo podatke kjer ne vemo kje se letališče nahaja in spremenimo tip
-+dbSendQuery(con, 
+dbSendQuery(con, 
             "DELETE from letalske_povezave WHERE idodhodno = '\\N'; ")
 dbSendQuery(con, 
             "DELETE from letalske_povezave WHERE idprihodno = '\\N'; ")
