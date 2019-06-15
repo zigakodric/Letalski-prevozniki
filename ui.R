@@ -26,7 +26,7 @@ navbarPage(theme = shinytheme("cerulean"), "Potovanje",
 
                         selectInput("drzave",label ='Mesto',choices=NULL,selected = "", multiple = FALSE,width="450px"),
                         selectInput("info", label =  "Zanima me", 
-                                    choices = c("Transport", "Zdravstvo", "Pravosodje", "Varnost", "Viza", "Splošno"), multiple = TRUE)
+                                    choices = c("Transport", "Zdravstvo", "Pravosodje", "Varnost", "Viza", "Splošno"), selected = "Transport", multiple = TRUE)
                       ),
                       mainPanel(h2("Informacije o destinaciji"),tableOutput("informacije"))
                     ))

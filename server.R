@@ -18,21 +18,27 @@ server <- function(input, output, session) {
   #Najprej iz baze uvozimo seznam vseh možnih držav
   
   uvoz_sezdr <- reactive({ 
-    g <- dbGetQuery(con, "SELECT drzava, id FROM letalisca")
+
+    g <- dbGetQuery(con, "SELECT drzava, id FROM letalisca ORDER BY drzava")
+
     })
   
   observe ({
     updateSelectInput(session,"drz","Država",
-                      choices = uvoz_sezdr()
+                      choices = uvoz_sezdr()[,1]
     )
     
   })
   
   uvoz_mesta <- reactive({
+    validate(need(input$drz != "", "Mesto ni podano!"))
+    
     sql <- "SELECT DISTINCT mesto, id FROM letalisca
                   WHERE drzava = ?dr"
     query <- sqlInterpolate(con, sql, dr = input$drz)
     t <- dbGetQuery(con, query)
+    setNames(t[,2], t[,1])
+    
 
     
   })
@@ -46,40 +52,37 @@ server <- function(input, output, session) {
 
 
   najdi_destinacije <-reactive({
-    l <- uvoz_mesta()
-    id2 <- l[l$mesto %in% input$mesta,][2]
+
     
     sql <- "SELECT ime, mesto, drzava, idprihodno,idodhodno FROM letalske_povezave 
     INNER JOIN letalisca
     ON letalisca.id = letalske_povezave.idprihodno
     WHERE letalske_povezave.idodhodno = ?id1"
-    query <- sqlInterpolate(con, sql,id1 = id2[1,]) #preprecimo sql injectione in izberemo prvo letališče v mestu
+    query <- sqlInterpolate(con, sql,id1 = input$mesta) #preprecimo sql injectione in izberemo prvo letališče v mestu
     t=dbGetQuery(con,query)
-    
+
     
   })
 
   
   output$destinacije <- renderTable({ #glavna tabela rezultatov
-    tabela1=najdi_destinacije()
+    tabela1 <- najdi_destinacije()
+    validate(need(nrow(tabela1) != 0, "Iz tega letališča ni povezav!"))
+
     tabela1[!duplicated(tabela1),]
     tabela1$idprihodno = NULL
     tabela1$idodhodno = NULL
     colnames(tabela1) <- c("Ime letališča", "Mesto", "Država")
-  
     tabela1
-    
-  
+    })
 
-  })
 
 
   #---------------------------------------------------------------------------------------------------
   #ZEMLJEVID
   podatki <- reactive({
+
     
-    l <- uvoz_mesta()
-    id2 <- l[l$mesto %in% input$mesta,][2]
 
   
     
@@ -89,8 +92,11 @@ server <- function(input, output, session) {
                              JOIN vse_povezave 
                              ON letalisca.id = vse_povezave.idprihodno
                              WHERE vse_povezave.idodhodno = ?id1"
-    query <- sqlInterpolate(con, sql,id1 = id2[1,])
+    query <- sqlInterpolate(con, sql,id1 = input$mesta)
     koordinate <- dbGetQuery(con, query)
+    validate(need(nrow(koordinate) != 0, "Iz tega letališča ni povezav!"))
+    
+
     koordinate$x <- as.numeric(koordinate$x)
     koordinate$y <- as.numeric(koordinate$y)
     
@@ -100,6 +106,7 @@ server <- function(input, output, session) {
   
   output$mymap <- renderLeaflet({
     df <- podatki()
+
     
     m <- leaflet(data = df) %>%
       addTiles() %>%
@@ -115,6 +122,7 @@ server <- function(input, output, session) {
 #Tretji zavihek
 #Uvoz seznama držav glede na tveganja, ki ga izberemo
   uvoz_drzave <- reactive({
+
     sql <- "SELECT  geopoliticalarea, id from tveg WHERE tveganja <= ?tvegid"
     query <- sqlInterpolate(con, sql,tvegid = input$tveganja)
   
@@ -132,6 +140,7 @@ server <- function(input, output, session) {
   
   #Pošiščemo informacije
   najdi_informacije <-reactive({
+
   
     sql_tra <- "SELECT travel_transportation FROM pot 
                           WHERE id = ?drzava_id"
@@ -140,8 +149,7 @@ server <- function(input, output, session) {
     sql_var <- "SELECT safety_and_security FROM pot WHERE id = ?drzava_id"
     sql_viz <- "SELECT entry_exit_requirements FROM pot WHERE id = ?drzava_id"
     sql_spl <- "SELECT destination_description FROM pot WHERE id = ?drzava_id"
-    
-    
+
 
     drzave = input$drzave
     izbira <- c("Transport", "Zdravstvo", "Pravosodje", "Varnost", "Viza", "Splošno")
@@ -158,13 +166,16 @@ server <- function(input, output, session) {
     informacije <- matrix(k, nrow = 1, length(k))
     colnames(informacije) <-input$info
     informacije
+    
+
 
     })
   
   
-  output$informacije <- renderTable({ #glavna tabela rezultatov
+  output$informacije <- renderTable({ #glavna tabela rezultatov}
+
     tabela1=najdi_informacije()
-  })
-#------------------------------------------------------------------------------------------------------------------------------
+  }, sanitize.text.function = function(x) x)
+  #------------------------------------------------------------------------------------------------------------------------------
 }  
 
