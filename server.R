@@ -1,8 +1,9 @@
 library(RPostgreSQL)
-source("auth_public.R")
 library(shiny)
 library(leaflet)
 library(dplyr)
+source("auth_public.R")
+
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname = db, host = host,
                  user = user, password = password)
@@ -53,7 +54,7 @@ server <- function(input, output, session) {
 
   najdi_destinacije <-reactive({
 
-    
+    validate(need(input$mesta != "", "Mesto ni podano!"))
     sql <- "SELECT ime, mesto, drzava, idprihodno,idodhodno FROM letalske_povezave 
     INNER JOIN letalisca
     ON letalisca.id = letalske_povezave.idprihodno
@@ -156,6 +157,8 @@ server <- function(input, output, session) {
     k <- c()
     info <- input$info
     sql_stavki <- c(sql_tra, sql_zdr,sql_zak,sql_var, sql_viz,sql_spl)
+    validate(need((length(info)) != 0, "Izberi informacije"))
+    
     for (i in 1:length(info)){
       
       indeks_stavek <- match(info[i],izbira)
